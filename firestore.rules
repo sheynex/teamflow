@@ -1,0 +1,139 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Auth Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isSuperAdminEmail() {
+      return isSignedIn() && 
+             request.auth.token.email != null && 
+             request.auth.token.email.lower() == 'servicefinda02@gmail.com';
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        isSuperAdminEmail() || 
+        (exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role in ['Admin', 'Super Admin', 'Manager'])
+      );
+    }
+
+    function canReadTask(data) {
+      return isAdmin() || (data != null && (
+             data.created_by == request.auth.uid || 
+             (data.assigned_ids is list && request.auth.uid in data.assigned_ids) ||
+             data.assigned_to == request.auth.uid));
+    }
+
+    function canReadDoc(data) {
+      return isAdmin() || (
+        data != null && 
+        data.is_locked != true && (
+          data.uploaded_by == request.auth.uid || 
+          data.created_by == request.auth.uid ||
+          (data.assigned_ids is list && request.auth.uid in data.assigned_ids) ||
+          (data.task_id != null && 
+           exists(/databases/$(database)/documents/tasks/$(data.task_id)) && 
+           canReadTask(get(/databases/$(database)/documents/tasks/$(data.task_id)).data))
+        )
+      );
+    }
+
+    // Global Super Admin access
+    match /{document=**} {
+      allow read, write: if isSuperAdminEmail();
+    }
+
+    // Profiles
+    match /profiles/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (request.auth.uid == userId || isSuperAdminEmail());
+      allow update: if isSignedIn() && (request.auth.uid == userId || isSuperAdminEmail() || isAdmin());
+      allow delete: if isSuperAdminEmail();
+    }
+
+    // Tasks Collection
+    match /tasks/{taskId} {
+      allow read: if isSignedIn() && canReadTask(resource.data);
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && canReadTask(resource.data);
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.created_by == request.auth.uid);
+      
+      match /comments/{commentId} { 
+        allow read: if isSignedIn() && canReadTask(get(/databases/$(database)/documents/tasks/$(taskId)).data);
+        allow write: if isSignedIn() && canReadTask(get(/databases/$(database)/documents/tasks/$(taskId)).data);
+      }
+    }
+    
+    // Legacy task comments
+    match /task_comments/{commentId} { 
+      allow read: if isSignedIn() && (
+        isAdmin() || 
+        (resource.data != null && (
+          resource.data.user_id == request.auth.uid || 
+          (resource.data.task_id != null && 
+           exists(/databases/$(database)/documents/tasks/$(resource.data.task_id)) && 
+           canReadTask(get(/databases/$(database)/documents/tasks/$(resource.data.task_id)).data))
+        ))
+      );
+      allow write: if isSignedIn();
+    }
+
+    // Documents
+    match /documents/{docId} {
+      allow read: if isSignedIn() && canReadDoc(resource.data);
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        isAdmin() || (
+          canReadDoc(resource.data) && 
+          resource.data.is_locked != true &&
+          request.resource.data.is_locked == resource.data.is_locked // Prevent non-admin from changing lock
+        )
+      );
+      allow delete: if isAdmin() || (
+        isSignedIn() && 
+        resource.data.uploaded_by == request.auth.uid && 
+        resource.data.is_locked != true
+      );
+      
+      match /versions/{vId} { allow read, write: if isSignedIn(); }
+      match /activities/{aId} { allow read, write: if isSignedIn(); }
+    }
+    
+    match /document_comments/{commentId} { allow read, write: if isSignedIn(); }
+    
+    match /folders/{folderId} { 
+      allow read: if isSignedIn() && (isAdmin() || (resource.data.is_locked != true));
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        isAdmin() || (
+          resource.data.is_locked != true &&
+          request.resource.data.is_locked == resource.data.is_locked
+        )
+      );
+      allow delete: if isAdmin();
+    }
+    match /time_tracking/{logId} { 
+      allow read: if isAdmin() || (isSignedIn() && (resource.data.user_id == request.auth.uid || resource.data.clock_out == null));
+      allow create: if isSignedIn();
+      allow update: if isAdmin() || (isSignedIn() && resource.data.user_id == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+    
+    match /document_activity/{id} { allow read: if isSignedIn(); allow write: if isSignedIn(); }
+    match /document_versions/{id} { allow read, write: if isSignedIn(); }
+    match /activity_logs/{id} { 
+       allow read: if isAdmin() || (isSignedIn() && resource.data.user_id == request.auth.uid);
+       allow create: if isSignedIn(); 
+    }
+    match /notifications/{id} { 
+      allow read: if isSignedIn() && resource.data.user_id == request.auth.uid;
+      allow write: if isSignedIn(); 
+    }
+
+    // Global fallback for any other collections
+    match /{document=**} {
+      allow read, write: if isSuperAdminEmail();
+    }
+  }
+}

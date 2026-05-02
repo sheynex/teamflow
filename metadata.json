@@ -1,0 +1,9 @@
+{
+  "name": "TeamFlow",
+  "description": "A comprehensive project management tool featuring task tracking, document management, employee time tracking, and activity logs.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}

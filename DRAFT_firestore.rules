@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Primitives
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    // Auth tokens don't have roles, we look up in profiles
+    function getProfile(uid) {
+      return get(/databases/$(database)/documents/profiles/$(uid)).data;
+    }
+    function isAdmin() {
+      return isSignedIn() && (getProfile(request.auth.uid).role == 'Admin' || getProfile(request.auth.uid).role == 'Super Admin');
+    }
+    function isSuperAdmin() {
+      return isSignedIn() && (getProfile(request.auth.uid).role == 'Super Admin' || request.auth.token.email == 'servicefinda02@gmail.com');
+    }
+
+    // Phase 4: Entity Validators
+    function isValidProfile(data) {
+      return data.keys().hasAll(['id', 'name', 'email', 'role']) &&
+             data.keys().size() <= 6 &&
+             data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() <= 100 &&
+             data.email is string && data.email.size() <= 100 &&
+             data.role in ['Super Admin', 'Admin', 'Manager', 'Staff'];
+    }
+
+    function isValidTask(data) {
+      return data.keys().hasAll(['id', 'title', 'status', 'priority', 'created_by']) &&
+             data.keys().size() <= 9 &&
+             data.id is string &&
+             data.title is string && data.title.size() <= 200 &&
+             data.status in ['Pending', 'In Progress', 'Review', 'Completed'] &&
+             data.priority in ['Low', 'Medium', 'High', 'Urgent'];
+    }
+
+    // --- COLLECTIONS ---
+
+    // Profiles
+    match /profiles/{userId} {
+      allow get: if isSignedIn() && isValidId(userId);
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && isOwner(userId) && isValidId(userId) && isValidProfile(incoming()) && incoming().role == 'Staff';
+      allow update: if isValidId(userId) && (
+        (isOwner(userId) && (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'avatar_url']) || (isSuperAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'name'])))) ||
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'name']))
+      ) && isValidProfile(incoming());
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isSignedIn() && isValidId(taskId);
+      allow create: if isSignedIn() && isValidId(taskId) && isValidTask(incoming()) && incoming().created_by == request.auth.uid;
+      allow update: if isValidId(taskId) && (
+        (isAdmin()) ||
+        (isOwner(existing().created_by) && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'status', 'priority', 'description', 'assigned_to', 'due_date'])) ||
+        (existing().assigned_to == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status']))
+      ) && isValidTask(incoming());
+      allow delete: if (isAdmin() || isOwner(existing().created_by)) && isValidId(taskId);
+    }
+
+    // Time Tracking
+    match /time_tracking/{logId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.user_id == request.auth.uid);
+      allow create: if isSignedIn() && incoming().user_id == request.auth.uid;
+      allow update: if isOwner(existing().user_id) && incoming().diff(existing()).affectedKeys().hasOnly(['clock_out', 'total_hours', 'breaks']);
+      allow delete: if isAdmin();
+    }
+
+    // Documents
+    match /documents/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isAdmin() || isOwner(existing().uploaded_by);
+      allow delete: if isAdmin();
+    }
+
+    // Activity Logs
+    match /activity_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+    }
+
+    // Notifications
+    match /notifications/{notifId} {
+      allow read: if isOwner(resource.data.user_id);
+      allow update: if isOwner(resource.data.user_id) && incoming().diff(existing()).affectedKeys().hasOnly(['is_read']);
+    }
+  }
+}

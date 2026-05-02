@@ -1,0 +1,211 @@
+{
+  "entities": {
+    "Profile": {
+      "title": "Profile",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["Super Admin", "Admin", "Manager", "Staff"] },
+        "avatar_url": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "email", "role"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Project task information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "In Progress", "Review", "Completed"] },
+        "priority": { "type": "string", "enum": ["Low", "Medium", "High", "Urgent"] },
+        "assigned_to": { "type": "string" },
+        "assigned_ids": { "type": "array", "items": { "type": "string" } },
+        "created_by": { "type": "string" },
+        "due_date": { "type": "string", "format": "date-time" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "checklist": { 
+          "type": "array", 
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "text": { "type": "string" },
+              "completed": { "type": "boolean" }
+            }
+          }
+        }
+      },
+      "required": ["id", "title", "status", "priority", "created_by"]
+    },
+    "TaskComment": {
+      "title": "TaskComment",
+      "description": "Comment on a task",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "task_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "content": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "task_id", "user_id", "content"]
+    },
+    "Folder": {
+      "title": "Folder",
+      "description": "Document folder",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "parent_id": { "type": "string" },
+        "created_by": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "is_locked": { "type": "boolean" },
+        "locked_by": { "type": "string" },
+        "locked_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "created_by"]
+    },
+    "Document": {
+      "title": "Document",
+      "description": "File or document metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "file_path": { "type": "string" },
+        "uploaded_by": { "type": "string" },
+        "task_id": { "type": "string" },
+        "folder_id": { "type": "string" },
+        "size": { "type": "number" },
+        "file_type": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "is_locked": { "type": "boolean" },
+        "locked_by": { "type": "string" },
+        "locked_at": { "type": "string", "format": "date-time" },
+        "assigned_ids": { "type": "array", "items": { "type": "string" } },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "uploaded_by"]
+    },
+    "DocumentVersion": {
+      "title": "DocumentVersion",
+      "description": "Version of a document",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "document_id": { "type": "string" },
+        "version_number": { "type": "number" },
+        "file_path": { "type": "string" },
+        "created_by": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "document_id", "version_number", "file_path", "created_by"]
+    },
+    "DocumentActivity": {
+      "title": "DocumentActivity",
+      "description": "Activity on a document",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "document_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "action": { "type": "string", "enum": ["opened", "edited", "downloaded"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "document_id", "user_id", "action"]
+    },
+    "TimeLog": {
+      "title": "TimeLog",
+      "description": "Time tracking log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "clock_in": { "type": "string", "format": "date-time" },
+        "clock_out": { "type": "string", "format": "date-time" },
+        "total_hours": { "type": "number" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "clock_in"]
+    },
+    "Activity": {
+      "title": "Activity",
+      "description": "System activity log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "action": { "type": "string" },
+        "target_type": { "type": "string" },
+        "target_id": { "type": "string" },
+        "description": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "action", "target_type"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User notification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "is_read": { "type": "boolean" },
+        "link": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "title", "message", "is_read"]
+    }
+  },
+  "firestore": {
+    "/profiles/{profileId}": {
+      "schema": "Profile",
+      "description": "User profiles"
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Project tasks"
+    },
+    "/tasks/{taskId}/comments/{commentId}": {
+      "schema": "TaskComment",
+      "description": "Comments on tasks"
+    },
+    "/folders/{folderId}": {
+      "schema": "Folder",
+      "description": "Document folders"
+    },
+    "/documents/{documentId}": {
+      "schema": "Document",
+      "description": "Document metadata"
+    },
+    "/documents/{documentId}/versions/{versionId}": {
+      "schema": "DocumentVersion",
+      "description": "Versions of documents"
+    },
+    "/documents/{documentId}/activities/{activityId}": {
+      "schema": "DocumentActivity",
+      "description": "Activities on documents"
+    },
+    "/time_tracking/{logId}": {
+      "schema": "TimeLog",
+      "description": "Time tracking logs"
+    },
+    "/activity_logs/{activityId}": {
+      "schema": "Activity",
+      "description": "System activity logs"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User notifications"
+    }
+  }
+}
